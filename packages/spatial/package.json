@@ -1,0 +1,13 @@
+{
+  "name": "@roomtrace/spatial",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@roomtrace/types": "*",
+    "@roomtrace/config": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}
