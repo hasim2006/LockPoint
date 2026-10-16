@@ -1,0 +1,52 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+.nyc_output
+
+# Production Builds
+dist
+build
+.next
+out
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# OS Metadata
+.DS_Store
+Thumbs.db
+
+# IDE & Editor files
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# AR & Spatial Assets
+*.ply
+*.pcd
+*.bin
+*.pt
+*.onnx
+uploads/
+cache/
+
+# Vercel & Deployments
+.vercel
+**/.vercel
+
+# Environment Variables
+.env
+.env.*
+!.env.example

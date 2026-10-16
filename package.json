@@ -1,0 +1,37 @@
+{
+  "name": "roomtrace-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RoomTrace: Production-quality spatial object movement tracking system using AR, CV, and 3D registration",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "node --import tsx --test tests/unit/*.test.ts",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "dev:api": "npm --workspace=@roomtrace/api run dev",
+    "dev:web": "npm --workspace=@roomtrace/web run dev",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "db:generate": "npm --workspace=@roomtrace/database run generate",
+    "db:seed": "npm --workspace=@roomtrace/database run seed"
+  },
+  "keywords": [
+    "augmented-reality",
+    "arcore",
+    "spatial-mapping",
+    "computer-vision",
+    "object-tracking",
+    "nextjs",
+    "fastify",
+    "typescript"
+  ],
+  "author": "RoomTrace Engineering",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.2"
+  }
+}
