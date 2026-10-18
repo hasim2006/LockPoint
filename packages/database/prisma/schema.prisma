@@ -1,0 +1,558 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum RoleType {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum ScanType {
+  BASELINE
+  REPEAT
+}
+
+enum ScanStatus {
+  PENDING
+  UPLOADING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum QualityLevel {
+  EXCELLENT
+  GOOD
+  ACCEPTABLE
+  POOR
+  UNRELIABLE
+}
+
+enum MovementStatus {
+  STABLE
+  MINOR_MOVEMENT
+  SIGNIFICANT_MOVEMENT
+  ROTATED_ONLY
+  NEW_OBJECT
+  DISAPPEARED
+  OCCLUDED
+  UNCERTAIN_TRACKING
+}
+
+enum JobStatus {
+  QUEUED
+  ACTIVE
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// 1. Users
+model User {
+  id                String         @id @default(uuid()) @db.Uuid
+  email             String         @unique
+  passwordHash      String
+  fullName          String
+  avatarUrl         String?
+  isActive          Boolean        @default(true)
+  emailVerifiedAt   DateTime?
+  mfaEnabled        Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  deletedAt         DateTime?
+
+  memberships       Membership[]
+  scans             RoomScan[]
+  devices           Device[]
+  apiKeys           ApiKey[]
+  refreshTokens     RefreshToken[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+
+  @@index([email])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+// 2. Organizations
+model Organization {
+  id                String         @id @default(uuid()) @db.Uuid
+  name              String
+  slug              String         @unique
+  plan              String         @default("PRO") // FREE, PRO, TEAM, ENTERPRISE
+  maxRooms          Int            @default(20)
+  maxScansPerMonth  Int            @default(200)
+  storageQuotaBytes BigInt         @default(10737418240) // 10 GB
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  deletedAt         DateTime?
+
+  memberships       Membership[]
+  projects          Project[]
+  rooms             Room[]
+  devices           Device[]
+  apiKeys           ApiKey[]
+  auditLogs         AuditLog[]
+
+  @@index([slug])
+  @@map("organizations")
+}
+
+// 3. Memberships
+model Membership {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @db.Uuid
+  organizationId String       @db.Uuid
+  role           RoleType     @default(MEMBER)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId, role])
+  @@map("memberships")
+}
+
+// 4. Roles
+model Role {
+  id             String           @id @default(uuid()) @db.Uuid
+  name           String           @unique
+  description    String?
+  isSystem       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  permissions    RolePermission[]
+
+  @@map("roles")
+}
+
+// 5. Permissions
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String           @unique
+  resource    String
+  action      String
+  description String?
+
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+// 6. Role Permissions (Join Table)
+model RolePermission {
+  id           String     @id @default(uuid()) @db.Uuid
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// 7. Projects
+model Project {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  name           String
+  description    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rooms          Room[]
+
+  @@index([organizationId])
+  @@map("projects")
+}
+
+// 8. Rooms
+model Room {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @db.Uuid
+  projectId      String?       @db.Uuid
+  name           String
+  floor          String?
+  building       String?
+  widthMeters    Float?
+  lengthMeters   Float?
+  heightMeters   Float?
+  baselineScanId String?       @db.Uuid
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  scans          RoomScan[]
+  objects        TrackedObject[]
+
+  @@index([organizationId, createdAt])
+  @@index([deletedAt])
+  @@map("rooms")
+}
+
+// 9. Room Scans
+model RoomScan {
+  id                     String           @id @default(uuid()) @db.Uuid
+  roomId                 String           @db.Uuid
+  userId                 String           @db.Uuid
+  deviceId               String?          @db.Uuid
+  scanType               ScanType         @default(REPEAT)
+  status                 ScanStatus       @default(PENDING)
+  qualityScore           Int              @default(80)
+  qualityLevel           QualityLevel     @default(GOOD)
+  featureCount           Int              @default(0)
+  planeCount             Int              @default(0)
+  detectedObjectCount    Int              @default(0)
+  trackingLossCount      Int              @default(0)
+  pointCloudUri          String?
+  planeMeshUri           String?
+  thumbnailUri           String?
+  registrationRmseMeters Float?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  deletedAt              DateTime?
+
+  room                   Room             @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user                   User             @relation(fields: [userId], references: [id])
+  device                 Device?          @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  session                ScanSession?
+  spatialMap             SpatialMap?
+  instances              ObjectInstance[]
+  processingJobs         ProcessingJob[]
+
+  @@index([roomId, scanType, createdAt])
+  @@index([status])
+  @@map("room_scans")
+}
+
+// 10. Scan Sessions
+model ScanSession {
+  id                String    @id @default(uuid()) @db.Uuid
+  scanId            String    @unique @db.Uuid
+  deviceId          String?   @db.Uuid
+  batteryLevel      Float?
+  startTime         DateTime  @default(now())
+  endTime           DateTime?
+  frameCount        Int       @default(0)
+  trackingLossCount Int       @default(0)
+  lightLevelLux     Float?
+  arRuntime         String    @default("ARCORE") // ARCORE, ARKIT, SIMULATOR
+
+  scan              RoomScan  @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@map("scan_sessions")
+}
+
+// 11. Spatial Maps
+model SpatialMap {
+  id                    String    @id @default(uuid()) @db.Uuid
+  scanId                String    @unique @db.Uuid
+  referenceFrame        String    @default("LOCAL_AR")
+  pointCloudUri         String?
+  planeMeshUri          String?
+  keyframeTrajectoryUri String?
+  coordinateSystem      String    @default("RIGHT_HANDED_Y_UP_Z_FORWARD")
+  minBoundsX            Float?
+  minBoundsY            Float?
+  minBoundsZ            Float?
+  maxBoundsX            Float?
+  maxBoundsY            Float?
+  maxBoundsZ            Float?
+  alignmentMatrixJson   Json?     // 4x4 matrix
+  registrationErrorRmse Float?
+  createdAt             DateTime  @default(now())
+
+  scan                  RoomScan  @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@map("spatial_maps")
+}
+
+// 12. Objects (Persistent Tracked Identity)
+model TrackedObject {
+  id                 String           @id @default(uuid()) @db.Uuid
+  roomId             String           @db.Uuid
+  persistentId       String           // e.g. "chair-01"
+  category           String           // chair, table, laptop, box, etc.
+  userDefinedName    String
+  baselinePositionX  Float
+  baselinePositionY  Float
+  baselinePositionZ  Float
+  baselineWidth      Float
+  baselineHeight     Float
+  baselineDepth      Float
+  status             String           @default("ACTIVE") // ACTIVE, ARCHIVED, MISSING
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  deletedAt          DateTime?
+
+  room               Room             @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  instances          ObjectInstance[]
+  positions          ObjectPosition[]
+  movementEvents     MovementEvent[]
+
+  @@unique([roomId, persistentId])
+  @@index([roomId, category])
+  @@map("objects")
+}
+
+// 13. Object Instances (Observation in a specific scan)
+model ObjectInstance {
+  id                     String              @id @default(uuid()) @db.Uuid
+  objectId               String              @db.Uuid
+  scanId                 String              @db.Uuid
+  category               String
+  bbox2dJson             Json                // {xMin, yMin, xMax, yMax}
+  bbox3dJson             Json?               // center, dimensions, rotation
+  posX                   Float
+  posY                   Float
+  posZ                   Float
+  rotQx                  Float               @default(0)
+  rotQy                  Float               @default(0)
+  rotQz                  Float               @default(0)
+  rotQw                  Float               @default(1)
+  widthMeters            Float
+  heightMeters           Float
+  depthMeters            Float
+  detectionConfidence    Float               @default(0.85)
+  trackingConfidence     Float               @default(0.80)
+  depthUncertaintyMeters Float               @default(0.03)
+  createdAt              DateTime            @default(now())
+
+  object                 TrackedObject       @relation(fields: [objectId], references: [id], onDelete: Cascade)
+  scan                   RoomScan            @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  observations           ObjectObservation[]
+
+  @@index([scanId, objectId])
+  @@map("object_instances")
+}
+
+// 14. Object Observations (Frame-by-frame raw detection)
+model ObjectObservation {
+  id                   String         @id @default(uuid()) @db.Uuid
+  objectInstanceId     String         @db.Uuid
+  frameId              Int
+  timestampMs          BigInt
+  cameraPoseMatrixJson Json           // 4x4 matrix
+  rawBboxNormalized    Json
+  featureDescriptor    Json?
+
+  instance             ObjectInstance @relation(fields: [objectInstanceId], references: [id], onDelete: Cascade)
+
+  @@index([objectInstanceId])
+  @@map("object_observations")
+}
+
+// 15. Object Positions (Canonical Historical Coordinates)
+model ObjectPosition {
+  id                          String        @id @default(uuid()) @db.Uuid
+  objectId                    String        @db.Uuid
+  scanId                      String        @db.Uuid
+  posX                        Float
+  posY                        Float
+  posZ                        Float
+  rotQx                       Float         @default(0)
+  rotQy                       Float         @default(0)
+  rotQz                       Float         @default(0)
+  rotQw                       Float         @default(1)
+  confidenceIntervalRadiusM   Float         @default(0.03)
+  coordinateFrameId           String        @default("ROOM_BASELINE")
+  createdAt                   DateTime      @default(now())
+
+  object                      TrackedObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
+
+  @@index([objectId, scanId])
+  @@map("object_positions")
+}
+
+// 16. Movement Events (Measurement & Comparison Results)
+model MovementEvent {
+  id                          String         @id @default(uuid()) @db.Uuid
+  objectId                    String         @db.Uuid
+  baselineScanId              String         @db.Uuid
+  compareScanId               String         @db.Uuid
+  movementStatus              MovementStatus
+  displacementEuclideanMeters Float
+  displacementHorizontalM     Float
+  displacementVerticalM       Float
+  displacementVecX            Float
+  displacementVecY            Float
+  displacementVecZ            Float
+  rotationDeltaDeg            Float          @default(0)
+  directionLabel              String
+  formattedDisplacement       String
+  confidenceScore             Int            // 0 - 100
+  uncertaintyRadiusMeters     Float
+  notes                       String?
+  createdAt                   DateTime       @default(now())
+
+  object                      TrackedObject  @relation(fields: [objectId], references: [id], onDelete: Cascade)
+
+  @@index([objectId, compareScanId])
+  @@index([compareScanId, movementStatus])
+  @@map("movement_events")
+}
+
+// 17. Devices
+model Device {
+  id              String       @id @default(uuid()) @db.Uuid
+  userId          String       @db.Uuid
+  organizationId  String       @db.Uuid
+  deviceName      String
+  model           String
+  osVersion       String
+  arCapabilities  String       // ARCORE, ARKIT, LIDAR
+  appVersion      String
+  lastSyncAt      DateTime     @default(now())
+  createdAt       DateTime     @default(now())
+
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  scans           RoomScan[]
+
+  @@index([userId, organizationId])
+  @@map("devices")
+}
+
+// 18. API Keys
+model ApiKey {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  userId         String       @db.Uuid
+  name           String
+  keyHash        String       @unique
+  keyPrefix      String       // e.g. "rt_live_..."
+  scopes         String       @default("read,write")
+  expiresAt      DateTime?
+  lastUsedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  revokedAt      DateTime?
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([keyHash])
+  @@map("api_keys")
+}
+
+// 19. Refresh Tokens
+model RefreshToken {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @db.Uuid
+  tokenHash   String    @unique
+  familyId    String    @db.Uuid // for token rotation family revocation
+  userAgent   String?
+  ipAddress   String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+// 20. Audit Logs
+model AuditLog {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String?      @db.Uuid
+  userId         String?      @db.Uuid
+  action         String
+  resourceType   String
+  resourceId     String?
+  metadataJson   Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime     @default(now())
+
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
+
+// 21. Notifications
+model Notification {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @db.Uuid
+  title          String
+  message        String
+  type           String    // SCAN_COMPLETED, MOVEMENT_ALERT, SYSTEM_WARNING
+  isRead         Boolean   @default(false)
+  readAt         DateTime?
+  actionUrl      String?
+  createdAt      DateTime  @default(now())
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// 22. Processing Jobs (BullMQ audit & status tracking)
+model ProcessingJob {
+  id           String     @id @default(uuid()) @db.Uuid
+  scanId       String     @db.Uuid
+  jobType      String     // SCAN_PROCESSING, SPATIAL_ALIGNMENT, REPORT_GENERATION
+  status       JobStatus  @default(QUEUED)
+  progressPct  Int        @default(0)
+  retryCount   Int        @default(0)
+  maxRetries   Int        @default(3)
+  errorCode    String?
+  errorMessage String?
+  payloadJson  Json?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime   @default(now())
+
+  scan         RoomScan   @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@index([scanId, status])
+  @@map("processing_jobs")
+}
+
+// 23. Model Versions
+model ModelVersion {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String
+  framework        String   // ONNX, TFLITE, PYTORCH
+  weightsUri       String
+  inputResolution  String   // "640x640"
+  classesSupported Json     // ["chair", "table", "laptop", ...]
+  inferenceTarget  String   @default("EDGE") // EDGE, SERVER
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  @@map("model_versions")
+}
+
+// 24. System Events
+model SystemEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  eventType     String
+  severity      String   // INFO, WARN, ERROR, CRITICAL
+  sourceService String
+  payloadJson   Json?
+  timestamp     DateTime @default(now())
+
+  @@index([eventType, timestamp])
+  @@map("system_events")
+}
