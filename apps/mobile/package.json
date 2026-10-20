@@ -1,0 +1,16 @@
+{
+  "name": "@roomtrace/mobile",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@roomtrace/config": "*",
+    "@roomtrace/types": "*",
+    "@roomtrace/spatial": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}
