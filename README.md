@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-lockpoint.vercel.app-0070F3?style=for-the-badge&logo=vercel&logoColor=white)](https://lockpoint.vercel.app)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-0070F3?style=for-the-badge&logo=vercel&logoColor=white)](https://roomtrace-fnwdw11wn-hasim2006s-projects.vercel.app/)
 [![GitHub Repo](https://img.shields.io/badge/GitHub-LockPoint-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/hasim2006/LockPoint)
 [![Next.js](https://img.shields.io/badge/Next.js%2015-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
 [![React 19](https://img.shields.io/badge/React%2019-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
@@ -14,7 +14,7 @@
 
 **Production-grade full-stack spatial computing system that detects, locks, stores, and measures the physical movement of objects inside indoor environments using smartphone cameras, computer vision, and ARCore/ARKit spatial mapping.**
 
-[Explore Live Demo](https://lockpoint.vercel.app) • [View Architecture](#-system-architecture) • [Quickstart Guide](#-quickstart--local-development) • [API Reference](#-api-endpoints)
+[Explore Live Demo](https://roomtrace-fnwdw11wn-hasim2006s-projects.vercel.app/) • [View Architecture](#-system-architecture) • [Quickstart Guide](#-quickstart--local-development) • [API Reference](#-api-endpoints)
 
 ---
 
@@ -22,7 +22,7 @@
 
 ## 🌐 Public Deployment & Live Links
 
-- 🚀 **Live Production Web App**: [https://lockpoint.vercel.app](https://lockpoint.vercel.app)
+- 🚀 **Live Production Web App**: [https://roomtrace-fnwdw11wn-hasim2006s-projects.vercel.app/](https://roomtrace-fnwdw11wn-hasim2006s-projects.vercel.app/)
 - 📦 **GitHub Repository**: [https://github.com/hasim2006/LockPoint](https://github.com/hasim2006/LockPoint)
 - 👨‍💻 **Author**: [Mohammad Hasim (@hasim2006)](https://github.com/hasim2006)
 
