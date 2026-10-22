@@ -1,0 +1,36 @@
+name: RoomTrace CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-and-verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Typecheck Workspace
+        run: npm run typecheck
+
+      - name: Run Deterministic Unit Tests
+        run: npm test
+
+      - name: Verify API Build
+        run: npm --workspace=@roomtrace/api run build
+
+      - name: Verify Web Dashboard Build
+        run: npm --workspace=@roomtrace/web run build
